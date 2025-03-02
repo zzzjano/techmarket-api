@@ -1,4 +1,4 @@
-export default products = [
+const products = [
     {
         id: 1,
         name: "MacBook Pro 16\"",
@@ -12,3 +12,5 @@ export default products = [
         createdAt: "2023-01-15T14:30:00Z"
     }
 ]
+
+module.exports = products;
