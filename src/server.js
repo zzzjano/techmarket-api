@@ -1,12 +1,11 @@
+require('dotenv').config()
 const express = require('express');
-const ENV = require('dotenv');
 const morgan = require('morgan');
 const cors = require('cors');
 
 const app = express();
 const { notFound, errorHandler } = require('./middleware/errorMiddleware.js');
 
-ENV.config();
 const port = process.env.SERVER_PORT || 3000;
 
 app.use(cors());
