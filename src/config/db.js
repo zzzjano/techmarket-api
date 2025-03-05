@@ -26,6 +26,7 @@ const testConnection = async () => {
     console.log('Database connection established successfully.');
     return true;
   } catch (error) {
+    console.error(error);
     console.error('Database connection failed:', error.message);
     return false;
   }
