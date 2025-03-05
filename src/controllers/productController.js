@@ -50,7 +50,9 @@ const getProductById = async (req, res, next) => {
     if (product) {
       res.status(200).json(product);
     } else {
-      res.status(404).json({ message: 'Product not found' });
+        const error = new Error('Product not found');
+        error.status = 404;
+        throw error;
     }
   } catch (error) {
     next(error);
@@ -60,13 +62,6 @@ const getProductById = async (req, res, next) => {
 const createProduct = async (req, res, next) => {
   try {
     const product = req.body;
-    
-    // Validate required fields
-    if(!product.name || !product.category || !product.description || 
-       !product.price || !product.stockCount || !product.brand || 
-       !product.imageUrl || product.isAvailable === undefined) {
-      return res.status(400).json({ message: 'All fields are required' });
-    }
     
     const newProduct = await productModel.create(product);
     res.status(201).json(newProduct);
@@ -81,7 +76,9 @@ const updateProduct = async (req, res, next) => {
     const product = await productModel.getById(id);
     
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+        const error = new Error('Product not found');
+        error.status = 404;
+        throw error;
     }
     
     const updatedProduct = await productModel.update(id, {
@@ -103,7 +100,9 @@ const deleteProduct = async (req, res, next) => {
     if (deleted) {
       res.status(200).json({ message: 'Product removed' });
     } else {
-      res.status(404).json({ message: 'Product not found' });
+        const error = new Error('Product not found');
+        error.status = 404;
+        throw error;
     }
   } catch (error) {
     next(error);
