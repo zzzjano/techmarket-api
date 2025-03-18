@@ -4,8 +4,8 @@ const validateProduct = [
     body('name').isString().isLength({ min: 3, max: 255 })
     .withMessage('Name must be between 3 and 255 characters'),
 
-    body('category').isString().isLength({ min: 3, max: 100 })
-    .withMessage('Category must be between 3 and 100 characters'),
+    body('category_id').isInt({ min: 1 })
+    .withMessage('Category ID must be an integer greater than 0'),
 
     body('description').isString().isLength({ min: 3 })
     .withMessage('Description must be at least 3 characters'),

@@ -17,6 +17,9 @@ app.use(morgan('dev'));
 // Routes
 const productRoutes = require('./routes/productRoutes.js');
 app.use('/api/products', productRoutes);
+app.use('/api/users', require('./routes/userRoutes.js'));
+app.use('/api/reviews', require('./routes/reviewRoutes.js'));
+app.use('/api/categories', require('./routes/categoryRoutes.js'));
 
 app.get('/', (req, res) => {
     res.send('Hello world');
