@@ -17,8 +17,8 @@ const getProducts = async (req, res, next) => {
     }
     
     // Additional filters
-    if (req.query.category) {
-      options.category = req.query.category;
+    if (req.query.category_id) {
+      options.category_id = req.query.category_id;
     }
     
     if (req.query.brand) {
@@ -38,7 +38,10 @@ const getProducts = async (req, res, next) => {
       ? await productModel.searchProducts(options)
       : await productModel.getAll();
       
-    res.status(200).json(products);
+      res.status(200).json({
+        success: true,
+        products
+      });
   } catch (error) {
     next(error);
   }
@@ -48,7 +51,10 @@ const getProductById = async (req, res, next) => {
   try {
     const product = await productModel.getById(parseInt(req.params.id));
     if (product) {
-      res.status(200).json(product);
+      res.status(200).json({
+        success: true,
+        product
+      });
     } else {
         const error = new Error('Product not found');
         error.status = 404;
@@ -64,7 +70,10 @@ const createProduct = async (req, res, next) => {
     const product = req.body;
     
     const newProduct = await productModel.create(product);
-    res.status(201).json(newProduct);
+    res.status(201).json({
+      success: true,
+      product: newProduct
+    });
   } catch (error) {
     next(error);
   }
@@ -86,7 +95,10 @@ const updateProduct = async (req, res, next) => {
       ...req.body
     });
     
-    res.status(200).json(updatedProduct);
+    res.status(200).json({
+      success: true,
+      product: updatedProduct
+    });
   } catch (error) {
     next(error);
   }
