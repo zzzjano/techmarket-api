@@ -4,13 +4,33 @@ const notFound = (req, res, next) => {
     next(error);
 };
 
-const errorHandler = (error, req, res, next) => {
-    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    res.status(statusCode).json({
+const errorHandler = (err, req, res, next) => {
+    if (err.code) {
+        switch (err.code) {
+          case 'ER_DUP_ENTRY':
+            return res.status(400).json({ 
+              message: 'Duplicate entry. This record already exists.' 
+            });
+          case 'ER_NO_SUCH_TABLE':
+            return res.status(500).json({ 
+              message: 'Database table not found. Please contact an administrator.' 
+            });
+          case 'ECONNREFUSED':
+            return res.status(500).json({ 
+              message: 'Database connection failed.' 
+            });
+          case 'ER_ACCESS_DENIED_ERROR':
+            return res.status(500).json({ 
+              message: 'Database access denied.' 
+            });
+        }
+      }
+    
+      res.status(err.status || 500).json({
         success: false,
-        message: error.message,
-        stack: process.env.NODE_ENV === 'production' ? '🥞' : error.stack,
-    });
+        message: err.message || 'An unexpected error occurred',
+        stack: process.env.NODE_ENV === 'production' ? '🥞' : err.stack
+      });
 }
 
 module.exports = { notFound, errorHandler };
