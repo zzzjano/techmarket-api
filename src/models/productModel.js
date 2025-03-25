@@ -1,150 +1,129 @@
-const db = require('../config/db');
+const { Product, Category } = require('./index');
+const { Op } = require('sequelize');
 
 // Get all products with category information
 const getAll = async () => {
-  return await db.query(`
-    SELECT p.*, c.name as category_name, c.description as category_description 
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-  `);
+  return await Product.findAll({
+    include: [{
+      model: Category,
+      attributes: ['name', 'description']
+    }]
+  });
 };
 
 // Get a single product by ID with category information
 const getById = async (id) => {
-  const products = await db.query(`
-    SELECT p.*, c.name as category_name, c.description as category_description 
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    WHERE p.id = ?
-  `, [id]);
-  return products[0];
+  return await Product.findByPk(id, {
+    include: [{
+      model: Category,
+      attributes: ['name', 'description']
+    }]
+  });
 };
 
 // Create a new product
 const create = async (product) => {
-  // If category provided by name, find its ID
-  let categoryId = product.category_id;
+  // Create new product with category_id
+  const newProduct = await Product.create({
+    name: product.name,
+    category_id: product.category_id,
+    description: product.description,
+    price: product.price,
+    stockCount: product.stockCount,
+    brand: product.brand,
+    imageUrl: product.imageUrl,
+    isAvailable: product.isAvailable !== undefined ? product.isAvailable : true
+  });
   
-  if (product.category_name && !categoryId) {
-    const categories = await db.query('SELECT id FROM categories WHERE name = ?', [product.category_name]);
-    if (categories.length > 0) {
-      categoryId = categories[0].id;
-    }
-  }
-  
-  const result = await db.query(
-    'INSERT INTO products (name, category_id, description, price, stockCount, brand, imageUrl, isAvailable) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [product.name, categoryId, product.description, product.price, 
-     product.stockCount, product.brand, product.imageUrl, product.isAvailable]
-  );
-  
-  // Fetch the newly created product with category information
-  return await getById(result.insertId);
+  return await getById(newProduct.id);
 };
 
 // Update a product
-const update = async (id, product) => {
-  // If category provided by name, find its ID
-  let categoryId = product.category_id;
+const update = async (id, productData) => {
+  const product = await Product.findByPk(id);
   
-  if (product.category_name && !categoryId) {
-    const categories = await db.query('SELECT id FROM categories WHERE name = ?', [product.category_name]);
-    if (categories.length > 0) {
-      categoryId = categories[0].id;
-    }
+  if (!product) {
+    throw new Error('Product not found');
   }
   
-  await db.query(
-    'UPDATE products SET name = ?, category_id = ?, description = ?, price = ?, stockCount = ?, brand = ?, imageUrl = ?, isAvailable = ? WHERE id = ?',
-    [product.name, categoryId, product.description, product.price, 
-     product.stockCount, product.brand, product.imageUrl, product.isAvailable, id]
-  );
+  // Update product fields directly from provided data
+  Object.keys(productData).forEach(key => {
+    if (productData[key] !== undefined) {
+      product[key] = productData[key];
+    }
+  });
   
-  // Return the updated product with category information
+  await product.save();
+  
   return await getById(id);
 };
 
 // Delete a product
 const remove = async (id) => {
-  const result = await db.query('DELETE FROM products WHERE id = ?', [id]);
-  return result.affectedRows > 0;
+  const rowsDeleted = await Product.destroy({
+    where: { id }
+  });
+  
+  return rowsDeleted > 0;
 };
 
-// Search products with filters and sorting - enhanced with category info
 const searchProducts = async (options = {}) => {
-  let query = `
-    SELECT p.*, c.name as category_name, c.description as category_description 
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    WHERE 1=1
-  `;
-  let params = [];
-
-  // Filter by availability
+  // Build where conditions
+  const whereConditions = {};
+  
+  const includeOptions = [{
+    model: Category,
+    attributes: ['name', 'description']
+  }];
+  
+  // Apply filters if provided
   if (options.available !== undefined) {
-    query += ' AND p.isAvailable = ?';
-    params.push(options.available);
-  }
-
-  // Filter by category ID
-  if (options.category_id) {
-    query += ' AND p.category_id = ?';
-    params.push(options.category_id);
+    whereConditions.isAvailable = options.available;
   }
   
-  // Filter by category name
-  if (options.category_name) {
-    query += ' AND c.name = ?';
-    params.push(options.category_name);
+  if (options.category_id) {
+    whereConditions.category_id = options.category_id;
   }
-
-  // Filter by brand
+  
   if (options.brand) {
-    query += ' AND p.brand = ?';
-    params.push(options.brand);
+    whereConditions.brand = options.brand;
   }
-
-  // Filter by price range
+  
+  // Apply price range filters
   if (options.minPrice !== undefined) {
-    query += ' AND p.price >= ?';
-    params.push(options.minPrice);
+    whereConditions.price = whereConditions.price || {};
+    whereConditions.price[Op.gte] = options.minPrice;
   }
   
   if (options.maxPrice !== undefined) {
-    query += ' AND p.price <= ?';
-    params.push(options.maxPrice);
+    whereConditions.price = whereConditions.price || {};
+    whereConditions.price[Op.lte] = options.maxPrice;
   }
-
-  // Sort options
+  
+  let order = [['id', 'ASC']];
+  
   if (options.sortBy) {
-    let orderBy;
+    const sortField = options.sortBy.toLowerCase();
+    const sortDirection = options.sortOrder?.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
     
-    switch(options.sortBy.toLowerCase()) {
+    switch(sortField) {
       case 'price':
-        orderBy = 'p.price';
+        order = [['price', sortDirection]];
         break;
       case 'name':
-        orderBy = 'p.name';
+        order = [['name', sortDirection]];
         break;
       case 'brand':
-        orderBy = 'p.brand';
+        order = [['brand', sortDirection]];
         break;
-      case 'category':
-        orderBy = 'c.name';
-        break;
-      default:
-        orderBy = 'p.id';
-    }
-    
-    query += ` ORDER BY ${orderBy}`;
-    if (options.sortOrder && options.sortOrder.toLowerCase() === 'desc') {
-      query += ' DESC';
-    } else {
-      query += ' ASC';
     }
   }
-
-  return await db.query(query, params);
+  
+  return await Product.findAll({
+    where: whereConditions,
+    include: includeOptions,
+    order: order
+  });
 };
 
 module.exports = {

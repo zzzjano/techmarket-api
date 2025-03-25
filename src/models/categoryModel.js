@@ -1,68 +1,60 @@
-const db = require('../config/db');
+const { Category } = require('./index');
 
 // Get all categories
 const getAll = async () => {
-  return await db.query('SELECT * FROM categories');
+  return await Category.findAll();
 };
 
 // Get a single category by ID
 const getById = async (id) => {
-  const categories = await db.query('SELECT * FROM categories WHERE id = ?', [id]);
-  return categories[0];
+  return await Category.findByPk(id);
 };
 
 // Get a category by name
 const getByName = async (name) => {
-  const categories = await db.query('SELECT * FROM categories WHERE name = ?', [name]);
-  return categories[0];
+  return await Category.findOne({
+    where: { name }
+  });
 };
 
 // Create a new category
 const create = async (category) => {
-  const result = await db.query(
-    'INSERT INTO categories (name, description) VALUES (?, ?)',
-    [category.name, category.description]
-  );
-  
-  return { 
-    id: result.insertId, 
-    ...category, 
-    createdAt: new Date().toISOString() 
-  };
+  return await Category.create({
+    name: category.name,
+    description: category.description
+  });
 };
 
 // Update a category
 const update = async (id, categoryData) => {
-  // First, get the current category data
   const currentCategory = await getById(id);
   
   if (!currentCategory) {
     throw new Error('Category not found');
   }
   
-  // Merge the current data with the new data, preserving existing values where not specified
-  const updatedCategory = {
-    name: categoryData.name !== undefined ? categoryData.name : currentCategory.name,
-    description: categoryData.description !== undefined ? categoryData.description : currentCategory.description
-  };
+  // Merge the current data with the new data
+  if (categoryData.name !== undefined) {
+    currentCategory.name = categoryData.name;
+  }
   
-  await db.query(
-    'UPDATE categories SET name = ?, description = ? WHERE id = ?',
-    [updatedCategory.name, updatedCategory.description, id]
-  );
+  if (categoryData.description !== undefined) {
+    currentCategory.description = categoryData.description;
+  }
   
-  return { 
-    id: parseInt(id), 
-    name: updatedCategory.name, 
-    description: updatedCategory.description,
-    createdAt: currentCategory.createdAt 
-  };
+  // Save changes
+  await currentCategory.save();
+  
+  return currentCategory;
 };
 
 // Delete a category
 const remove = async (id) => {
-  const result = await db.query('DELETE FROM categories WHERE id = ?', [id]);
-  return result.affectedRows > 0;
+  const rowsDeleted = await Category.destroy({
+    where: { id }
+  });
+  
+  return rowsDeleted > 0;
 };
 
 module.exports = {

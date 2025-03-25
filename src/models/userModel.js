@@ -1,69 +1,87 @@
-const db = require('../config/db');
+const { User } = require('./index');
 const bcrypt = require('bcrypt');
 
 // Get all users
 const getAll = async () => {
-  return await db.query('SELECT id, username, email, first_name, last_name, createdAt FROM users');
+  return await User.findAll({
+    attributes: ['id', 'username', 'email', 'first_name', 'last_name', 'createdAt']
+  });
 };
 
 // Get a user by ID
 const getById = async (id) => {
-  const users = await db.query('SELECT id, username, email, first_name, last_name, createdAt FROM users WHERE id = ?', [id]);
-  return users[0];
+  return await User.findByPk(id, {
+    attributes: ['id', 'username', 'email', 'first_name', 'last_name', 'createdAt']
+  });
 };
 
 // Get a user by username
 const getByUsername = async (username) => {
-  const users = await db.query('SELECT * FROM users WHERE username = ?', [username]);
-  return users[0];
+  return await User.findOne({
+    where: { username }
+  });
 };
 
 // Get a user by email
 const getByEmail = async (email) => {
-  const users = await db.query('SELECT * FROM users WHERE email = ?', [email]);
-  return users[0];
+  return await User.findOne({
+    where: { email }
+  });
 };
 
 // Update a user
 const update = async (id, userData) => {
-  // First get the current user data
-  const currentUser = await getById(id);
+  const currentUser = await User.findByPk(id);
   
   if (!currentUser) {
     throw new Error('User not found');
   }
   
-  // Merge the current data with the new data, preserving existing values where not specified
-  const updatedUser = {
-    username: userData.username !== undefined ? userData.username : currentUser.username,
-    email: userData.email !== undefined ? userData.email : currentUser.email,
-    first_name: userData.firstName !== undefined ? userData.firstName : currentUser.first_name,
-    last_name: userData.lastName !== undefined ? userData.lastName : currentUser.last_name
-  };
+  // Update fields if provided
+  if (userData.username !== undefined) {
+    currentUser.username = userData.username;
+  }
   
-  let query = 'UPDATE users SET username = ?, email = ?, first_name = ?, last_name = ?';
-  let params = [updatedUser.username, updatedUser.email, updatedUser.first_name, updatedUser.last_name];
+  if (userData.email !== undefined) {
+    currentUser.email = userData.email;
+  }
+  
+  if (userData.firstName !== undefined) {
+    currentUser.first_name = userData.firstName;
+  }
+  
+  if (userData.lastName !== undefined) {
+    currentUser.last_name = userData.lastName;
+  }
   
   // If password is provided, hash it and update
   if (userData.password) {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(userData.password, salt);
-    query += ', password_hash = ?';
-    params.push(hashedPassword);
+    currentUser.password_hash = hashedPassword;
   }
   
-  query += ' WHERE id = ?';
-  params.push(id);
+  // Save changes
+  await currentUser.save();
   
-  await db.query(query, params);
-  
-  return await getById(id);
+  // Return user without password hash
+  return {
+    id: currentUser.id,
+    username: currentUser.username,
+    email: currentUser.email,
+    first_name: currentUser.first_name,
+    last_name: currentUser.last_name,
+    createdAt: currentUser.createdAt
+  };
 };
 
 // Delete a user
 const remove = async (id) => {
-  const result = await db.query('DELETE FROM users WHERE id = ?', [id]);
-  return result.affectedRows > 0;
+  const rowsDeleted = await User.destroy({
+    where: { id }
+  });
+  
+  return rowsDeleted > 0;
 };
 
 module.exports = {
