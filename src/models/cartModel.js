@@ -46,19 +46,9 @@ const getCartWithItems = async (userId) => {
     return sum + (parseFloat(item.Product.price) * item.quantity);
   }, 0);
   
-  // Add all items to cart
-  const items = cartItems.map(item => ({
-    id: item.id,
-    product_id: item.product_id,
-    quantity: item.quantity,
-    price: parseFloat(item.Product.price),
-    itemTotal: parseFloat(item.Product.price) * item.quantity,
-    product: item.Product
-  }));
   
   return {
     ...cart.toJSON(),
-    items,
     itemCount,
     totalQuantity,
     subtotal
