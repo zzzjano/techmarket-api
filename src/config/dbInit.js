@@ -1,101 +1,33 @@
-const { query } = require('./db');
+const { sequelize } = require('./db');
+const { Category, User, Product, Review, Cart, CartItem } = require('../models');
+const bcrypt = require('bcrypt'); // Add this package for password hashing if not already included
 
 // Initialize database
 const initDatabase = async () => {
   try {
     console.log('Initializing database...');
     
-    // Create categories table
-    const createCategoriesTable = `
-      CREATE TABLE IF NOT EXISTS categories (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL UNIQUE,
-        description TEXT,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
-    
-    await query(createCategoriesTable);
-    console.log('Categories table created or already exists');
-
-    // Create users table
-    const createUsersTable = `
-      CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(50) NOT NULL UNIQUE,
-        email VARCHAR(100) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        first_name VARCHAR(50),
-        last_name VARCHAR(50),
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
-    
-    await query(createUsersTable);
-    console.log('Users table created or already exists');
-    
-    // Create products table with category_id as foreign key
-    const createProductsTable = `
-      CREATE TABLE IF NOT EXISTS products (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        category_id INT,
-        description TEXT NOT NULL,
-        price DECIMAL(10, 2) NOT NULL,
-        stockCount INT NOT NULL,
-        brand VARCHAR(100) NOT NULL,
-        imageUrl VARCHAR(255) NOT NULL,
-        isAvailable BOOLEAN DEFAULT TRUE,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
-      )
-    `;
-    
-    await query(createProductsTable);
-    console.log('Products table created or already exists');
-
-    // Create reviews table
-    const createReviewsTable = `
-      CREATE TABLE IF NOT EXISTS reviews (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        product_id INT NOT NULL,
-        user_id INT NOT NULL,
-        rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
-        comment TEXT,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `;
-    
-    await query(createReviewsTable);
-    console.log('Reviews table created or already exists');
+    await sequelize.sync();
+    console.log('Database tables synchronized');
     
     // Check if there are any categories in the table
-    const categories = await query('SELECT COUNT(*) as count FROM categories');
+    const categoriesCount = await Category.count();
     
     // If no categories, insert sample categories
-    if (categories[0].count === 0) {
+    if (categoriesCount === 0) {
       const defaultCategories = [
         { name: 'Laptopy', description: 'Laptopy i ultrabooki' },
       ];
       
-      for (const category of defaultCategories) {
-        await query(
-          `INSERT INTO categories (name, description) VALUES (?, ?)`,
-          [category.name, category.description]
-        );
-      }
-      
+      await Category.bulkCreate(defaultCategories);
       console.log('Inserted sample categories');
     }
     
     // Check if there are any products in the table
-    const products = await query('SELECT COUNT(*) as count FROM products');
+    const productsCount = await Product.count();
     
     // If no products, insert sample data
-    if (products[0].count === 0) {
-      
+    if (productsCount === 0) {
       const productsData = [
         {
           name: 'Dell XPS 13',
@@ -105,34 +37,17 @@ const initDatabase = async () => {
           stockCount: 10,
           brand: 'Dell',
           imageUrl: 'https://placehold.co/400',
-
         }
-      ]
+      ];
       
-      // Insert each product
-      for (const product of productsData) {
-        await query(
-          `INSERT INTO products (name, category_id, description, price, stockCount, brand, imageUrl)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [
-            product.name,
-            product.category_id,
-            product.description,
-            product.price,
-            product.stockCount,
-            product.brand,
-            product.imageUrl
-          ]
-        );
-      }
-      
+      await Product.bulkCreate(productsData);
       console.log('Inserted sample data into products table');
     }
 
     // Check if there are any users in the table
-    const users = await query('SELECT COUNT(*) as count FROM users');
+    const usersCount = await User.count();
 
-    if(users[0].count === 0) {
+    if (usersCount === 0) {
       const defaultUsers = [
         { 
           username: 'admin', 
@@ -141,18 +56,14 @@ const initDatabase = async () => {
         }
       ];
 
-      for (const user of defaultUsers) {
-        await query(
-          `INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)`,
-          [user.username, user.email, user.password_hash]
-        );
-      }
+      await User.bulkCreate(defaultUsers);
+      console.log('Inserted sample users');
     }
 
     // Check if there are any reviews in the table
-    const reviews = await query('SELECT COUNT(*) as count FROM reviews');
+    const reviewsCount = await Review.count();
 
-    if(reviews[0].count === 0) {
+    if (reviewsCount === 0) {
       const defaultReviews = [
         {
           product_id: 1,
@@ -162,12 +73,39 @@ const initDatabase = async () => {
         }
       ];
 
-      for (const review of defaultReviews) {
-        await query(
-          `INSERT INTO reviews (product_id, user_id, rating, comment) VALUES (?, ?, ?, ?)`,
-          [review.product_id, review.user_id, review.rating, review.comment]
-        );
-      }
+      await Review.bulkCreate(defaultReviews);
+      console.log('Inserted sample reviews');
+    }
+
+    // Check if there are any carts in the table
+    const cartsCount = await Cart.count();
+
+    if (cartsCount === 0) {
+      const defaultCarts = [
+        {
+          user_id: 1,
+          total: 0
+        }
+      ];
+
+      await Cart.bulkCreate(defaultCarts);
+      console.log('Inserted sample carts');
+    }
+
+    // Check if there are any cart items in the table
+    const cartItemsCount = await CartItem.count();
+
+    if (cartItemsCount === 0) {
+      const defaultCartItems = [
+        {
+          cart_id: 1,
+          product_id: 1,
+          quantity: 1
+        }
+      ];
+
+      await CartItem.bulkCreate(defaultCartItems);
+      console.log('Inserted sample cart items');
     }
     
     return true;

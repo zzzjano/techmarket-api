@@ -1,89 +1,121 @@
-const db = require('../config/db');
+const { Review, User, Product } = require('./index');
+const { Sequelize } = require('sequelize');
 
 // Get all reviews
 const getAll = async () => {
-  return await db.query(`
-    SELECT r.*, u.username, p.name as product_name 
-    FROM reviews r
-    JOIN users u ON r.user_id = u.id
-    JOIN products p ON r.product_id = p.id
-    ORDER BY r.createdAt DESC
-  `);
+  return await Review.findAll({
+    include: [
+      {
+        model: User,
+        attributes: ['username']
+      },
+      {
+        model: Product,
+        attributes: ['name']
+      }
+    ],
+    order: [['createdAt', 'DESC']]
+  });
 };
 
 // Get a single review by ID
 const getById = async (id) => {
-  const reviews = await db.query(`
-    SELECT r.*, u.username, p.name as product_name 
-    FROM reviews r
-    JOIN users u ON r.user_id = u.id
-    JOIN products p ON r.product_id = p.id
-    WHERE r.id = ?
-  `, [id]);
-  return reviews[0];
+  return await Review.findByPk(id, {
+    include: [
+      {
+        model: User,
+        attributes: ['username']
+      },
+      {
+        model: Product,
+        attributes: ['name']
+      }
+    ]
+  });
 };
 
 // Get all reviews for a specific product
 const getByProductId = async (productId) => {
-  return await db.query(`
-    SELECT r.*, u.username 
-    FROM reviews r
-    JOIN users u ON r.user_id = u.id
-    WHERE r.product_id = ?
-    ORDER BY r.createdAt DESC
-  `, [productId]);
+  return await Review.findAll({
+    where: { product_id: productId },
+    include: [
+      {
+        model: User,
+        attributes: ['username']
+      }
+    ],
+    order: [['createdAt', 'DESC']]
+  });
 };
 
 // Get all reviews by a specific user
 const getByUserId = async (userId) => {
-  return await db.query(`
-    SELECT r.*, p.name as product_name 
-    FROM reviews r
-    JOIN products p ON r.product_id = p.id
-    WHERE r.user_id = ?
-    ORDER BY r.createdAt DESC
-  `, [userId]);
+  return await Review.findAll({
+    where: { user_id: userId },
+    include: [
+      {
+        model: Product,
+        attributes: ['name']
+      }
+    ],
+    order: [['createdAt', 'DESC']]
+  });
 };
 
 // Create a new review
 const create = async (review) => {
-  const result = await db.query(
-    'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES (?, ?, ?, ?)',
-    [review.product_id, review.user_id, review.rating, review.comment]
-  );
-  
-  return { 
-    id: result.insertId, 
-    ...review, 
-    createdAt: new Date().toISOString() 
-  };
+  return await Review.create({
+    product_id: review.product_id,
+    user_id: review.user_id,
+    rating: review.rating,
+    comment: review.comment
+  });
 };
 
 // Update a review
-const update = async (id, review) => {
-  await db.query(
-    'UPDATE reviews SET rating = ?, comment = ? WHERE id = ?',
-    [review.rating, review.comment, id]
-  );
+const update = async (id, reviewData) => {
+  const review = await Review.findByPk(id);
   
-  return { id: parseInt(id), ...review };
+  if (!review) {
+    throw new Error('Review not found');
+  }
+  
+  if (reviewData.rating !== undefined) {
+    review.rating = reviewData.rating;
+  }
+  
+  if (reviewData.comment !== undefined) {
+    review.comment = reviewData.comment;
+  }
+  
+  await review.save();
+  
+  return review;
 };
 
 // Delete a review
 const remove = async (id) => {
-  const result = await db.query('DELETE FROM reviews WHERE id = ?', [id]);
-  return result.affectedRows > 0;
+  const rowsDeleted = await Review.destroy({
+    where: { id }
+  });
+  
+  return rowsDeleted > 0;
 };
 
 // Get product average rating
 const getProductAverageRating = async (productId) => {
-  const results = await db.query(
-    'SELECT AVG(rating) as average_rating, COUNT(*) as total_reviews FROM reviews WHERE product_id = ?',
-    [productId]
-  );
+  const result = await Review.findOne({
+    where: { product_id: productId },
+    attributes: [
+      [Sequelize.fn('AVG', Sequelize.col('rating')), 'average_rating'],
+      [Sequelize.fn('COUNT', Sequelize.col('id')), 'total_reviews']
+    ],
+    raw: true
+  });
+  
   return {
-    average_rating: parseFloat(results[0].average_rating || 0).toFixed(1),
-    total_reviews: results[0].total_reviews
+    average_rating: parseFloat(result?.average_rating || 0).toFixed(1),
+    total_reviews: parseInt(result?.total_reviews || 0)
   };
 };
 
