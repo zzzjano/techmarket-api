@@ -45,11 +45,21 @@ const getCartWithItems = async (userId) => {
   const subtotal = cartItems.reduce((sum, item) => {
     return sum + (parseFloat(item.Product.price) * item.quantity);
   }, 0);
+
+  const items = cartItems.map(item => ({
+    id: item.id,
+    product_id: item.product_id,
+    quantity: item.quantity,
+    price: parseFloat(item.Product.price),
+    itemTotal: parseFloat(item.Product.price) * item.quantity,
+    product: item.Product
+  }));
   
   
   return {
     ...cart.toJSON(),
     itemCount,
+    items,
     totalQuantity,
     subtotal
   };
