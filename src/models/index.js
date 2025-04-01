@@ -1,15 +1,13 @@
-const Category = require('./category');
-const User = require('./user');
-const Product = require('./product');
-const Review = require('./review');
-const Cart = require('./cart');
-const CartItem = require('./cartItem');
+const User = require('./userSchema');
+const Product = require('./productSchema');
+const Category = require('./categorySchema');
+const { Review } = require('./reviewSchema');
+const Cart = require('./cartSchema');
 
 module.exports = {
-  Category,
   User,
   Product,
+  Category,
   Review,
-  Cart,
-  CartItem
+  Cart
 };

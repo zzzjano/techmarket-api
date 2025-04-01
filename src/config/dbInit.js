@@ -1,113 +1,133 @@
-const { sequelize } = require('./db');
-const { Category, User, Product, Review, Cart, CartItem } = require('../models');
-const bcrypt = require('bcrypt'); // Add this package for password hashing if not already included
+const { connectToMongoDB, getDb } = require('./mongodb');
+const User = require('../models/userSchema');
+const Product = require('../models/productSchema');
+const Category = require('../models/categorySchema');
+const { Review } = require('../models/reviewSchema');
+const Cart = require('../models/cartSchema');
+const bcrypt = require('bcrypt');
 
 // Initialize database
 const initDatabase = async () => {
   try {
-    console.log('Initializing database...');
+    console.log('Initializing MongoDB database...');
     
-    await sequelize.sync();
-    console.log('Database tables synchronized');
+    // Connect to MongoDB
+    await connectToMongoDB();
     
-    // Check if there are any categories in the table
-    const categoriesCount = await Category.count();
+    // Initialize collections with sample data
     
-    // If no categories, insert sample categories
+    // Categories
+    const categoriesCount = await Category.countDocuments();
     if (categoriesCount === 0) {
       const defaultCategories = [
         { name: 'Laptopy', description: 'Laptopy i ultrabooki' },
+        { name: 'Smartfony', description: 'Telefony komórkowe i smartfony' },
+        { name: 'Akcesoria', description: 'Akcesoria komputerowe i elektroniczne' }
       ];
       
-      await Category.bulkCreate(defaultCategories);
+      await Category.insertMany(defaultCategories);
       console.log('Inserted sample categories');
     }
     
-    // Check if there are any products in the table
-    const productsCount = await Product.count();
+    // Get the laptop category for product creation
+    const laptopCategory = await Category.findOne({ name: 'Laptopy' });
     
-    // If no products, insert sample data
+    // Products
+    const productsCount = await Product.countDocuments();
     if (productsCount === 0) {
-      const productsData = [
+      const defaultProducts = [
         {
           name: 'Dell XPS 13',
-          category_id: 1,
+          category: laptopCategory._id,
           description: 'Laptop Dell XPS 13 z procesorem Intel Core i7 11. generacji',
           price: 6999.99,
           stockCount: 10,
           brand: 'Dell',
           imageUrl: 'https://placehold.co/400',
+          isAvailable: true
+        },
+        {
+          name: 'MacBook Pro 14',
+          category: laptopCategory._id,
+          description: 'Apple MacBook Pro z procesorem M1 Pro',
+          price: 9999.99,
+          stockCount: 5,
+          brand: 'Apple',
+          imageUrl: 'https://placehold.co/400',
+          isAvailable: true
         }
       ];
       
-      await Product.bulkCreate(productsData);
-      console.log('Inserted sample data into products table');
+      await Product.insertMany(defaultProducts);
+      console.log('Inserted sample products');
     }
-
-    // Check if there are any users in the table
-    const usersCount = await User.count();
-
+    
+    // Users
+    const usersCount = await User.countDocuments();
     if (usersCount === 0) {
+      // Generate hashed password for admin user
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash('admin123', salt);
+      
       const defaultUsers = [
         { 
           username: 'admin', 
           email: 'milewczykjan@gmail.com',
-          password_hash: '$2b$10$eYl5C'
+          password_hash: hashedPassword,
+          first_name: 'Admin',
+          last_name: 'User'
         }
       ];
-
-      await User.bulkCreate(defaultUsers);
+      
+      await User.insertMany(defaultUsers);
       console.log('Inserted sample users');
     }
-
-    // Check if there are any reviews in the table
-    const reviewsCount = await Review.count();
-
-    if (reviewsCount === 0) {
+    
+    // Get the first user and product for reviews and cart
+    const firstUser = await User.findOne({});
+    const firstProduct = await Product.findOne({});
+    
+    // Reviews
+    const reviewsCount = await Review.countDocuments();
+    if (reviewsCount === 0 && firstUser && firstProduct) {
       const defaultReviews = [
         {
-          product_id: 1,
-          user_id: 1,
+          productId: firstProduct._id,
+          userId: firstUser._id,
           rating: 5,
-          comment: 'Super laptop!'
+          title: 'Wspaniały laptop!',
+          content: 'Ten laptop przekroczył moje oczekiwania. Szybki, wydajny i elegancki.',
+          pros: ['Długi czas pracy baterii', 'Wysoka wydajność', 'Elegancki design'],
+          cons: ['Wysoka cena', 'Ograniczona liczba portów'],
+          verifiedPurchase: true,
+          helpfulVotes: 3
         }
       ];
-
-      await Review.bulkCreate(defaultReviews);
+      
+      await Review.insertMany(defaultReviews);
       console.log('Inserted sample reviews');
     }
-
-    // Check if there are any carts in the table
-    const cartsCount = await Cart.count();
-
-    if (cartsCount === 0) {
-      const defaultCarts = [
-        {
-          user_id: 1,
-          total: 0
-        }
-      ];
-
-      await Cart.bulkCreate(defaultCarts);
-      console.log('Inserted sample carts');
-    }
-
-    // Check if there are any cart items in the table
-    const cartItemsCount = await CartItem.count();
-
-    if (cartItemsCount === 0) {
-      const defaultCartItems = [
-        {
-          cart_id: 1,
-          product_id: 1,
-          quantity: 1
-        }
-      ];
-
-      await CartItem.bulkCreate(defaultCartItems);
-      console.log('Inserted sample cart items');
+    
+    // Carts
+    const cartsCount = await Cart.countDocuments();
+    if (cartsCount === 0 && firstUser && firstProduct) {
+      const defaultCart = {
+        user: firstUser._id,
+        items: [
+          {
+            product: firstProduct._id,
+            quantity: 1,
+            price: firstProduct.price
+          }
+        ],
+        total: firstProduct.price
+      };
+      
+      await Cart.create(defaultCart);
+      console.log('Inserted sample cart');
     }
     
+    console.log('Database initialization completed successfully');
     return true;
   } catch (error) {
     console.error('Database initialization failed:', error.message);

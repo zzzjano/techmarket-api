@@ -1,37 +1,29 @@
-const { User } = require('./index');
+const User = require('./userSchema');
 const bcrypt = require('bcrypt');
 
 // Get all users
 const getAll = async () => {
-  return await User.findAll({
-    attributes: ['id', 'username', 'email', 'first_name', 'last_name', 'createdAt']
-  });
+  return await User.find({}, { password_hash: 0 });
 };
 
 // Get a user by ID
 const getById = async (id) => {
-  return await User.findByPk(id, {
-    attributes: ['id', 'username', 'email', 'first_name', 'last_name', 'createdAt']
-  });
+  return await User.findById(id, { password_hash: 0 });
 };
 
 // Get a user by username
 const getByUsername = async (username) => {
-  return await User.findOne({
-    where: { username }
-  });
+  return await User.findOne({ username });
 };
 
 // Get a user by email
 const getByEmail = async (email) => {
-  return await User.findOne({
-    where: { email }
-  });
+  return await User.findOne({ email });
 };
 
 // Update a user
 const update = async (id, userData) => {
-  const currentUser = await User.findByPk(id);
+  const currentUser = await User.findById(id);
   
   if (!currentUser) {
     throw new Error('User not found');
@@ -65,23 +57,36 @@ const update = async (id, userData) => {
   await currentUser.save();
   
   // Return user without password hash
-  return {
-    id: currentUser.id,
-    username: currentUser.username,
-    email: currentUser.email,
-    first_name: currentUser.first_name,
-    last_name: currentUser.last_name,
-    createdAt: currentUser.createdAt
-  };
+  const { password_hash, ...userWithoutPassword } = currentUser.toObject();
+  return userWithoutPassword;
+};
+
+const create = async (userData) => {
+  
+  // Hash the password
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(userData.password, salt);
+  
+  // Create new user
+  const newUser = new User({
+    username: userData.username,
+    email: userData.email,
+    password_hash: hashedPassword,
+    first_name: userData.firstName,
+    last_name: userData.lastName,
+  });
+  
+  await newUser.save();
+  
+  // Return user without password hash
+  const { password_hash, ...userWithoutPassword } = newUser.toObject();
+  return userWithoutPassword;
 };
 
 // Delete a user
 const remove = async (id) => {
-  const rowsDeleted = await User.destroy({
-    where: { id }
-  });
-  
-  return rowsDeleted > 0;
+  const result = await User.deleteOne({ _id: id });
+  return result.deletedCount > 0;
 };
 
 module.exports = {
@@ -91,4 +96,5 @@ module.exports = {
   getByEmail,
   update,
   remove,
+  create
 };

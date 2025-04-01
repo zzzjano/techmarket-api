@@ -1,240 +1,138 @@
-const { Cart, CartItem, Product, Category } = require('./index');
-const { sequelize } = require('../config/db');
+const Cart = require('./cartSchema');
+const Product = require('./productSchema');
 
-// Get cart for a user, create if doesn't exist
-const getOrCreateCart = async (userId) => {
-  let cart = await Cart.findOne({
-    where: { user_id: userId }
+// Get a cart by user ID
+const getByUser = async (userId) => {
+  return await Cart.findOne({ user: userId }).populate({
+    path: 'items.product',
+    model: 'Product'
   });
-  
-  if (!cart) {
-    cart = await Cart.create({
-      user_id: userId
-    });
-  }
-  
-  return cart;
 };
 
-// Get cart with items
-const getCartWithItems = async (userId) => {
-  const cart = await Cart.findOne({
-    where: { user_id: userId },
-    include: [
-      {
-        model: CartItem,
-        include: [
-          {
-            model: Product,
-            include: [Category],
-            attributes: ['id', 'name', 'imageUrl', 'price', 'stockCount', 'isAvailable']
-          }
-        ]
-      }
-    ]
+// Create a new cart for a user
+const create = async (userId) => {
+  const newCart = new Cart({
+    user: userId,
+    items: [],
+    total: 0
   });
   
-  if (!cart) {
-    return await getOrCreateCart(userId);
-  }
-  
-  // Calculate cart totals
-  const cartItems = cart.CartItems || [];
-  const itemCount = cartItems.length;
-  const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = cartItems.reduce((sum, item) => {
-    return sum + (parseFloat(item.Product.price) * item.quantity);
-  }, 0);
-
-  const items = cartItems.map(item => ({
-    id: item.id,
-    product_id: item.product_id,
-    quantity: item.quantity,
-    price: parseFloat(item.Product.price),
-    itemTotal: parseFloat(item.Product.price) * item.quantity,
-    product: item.Product
-  }));
-  
-  
-  return {
-    ...cart.toJSON(),
-    itemCount,
-    items,
-    totalQuantity,
-    subtotal
-  };
+  return await newCart.save();
 };
 
 // Add item to cart
-const addItemToCart = async (userId, productData) => {
-  try {
-    // Get cart or create if doesn't exist
-    const cart = await getOrCreateCart(userId);
-    
-    // Check if product exists and is available
-    const product = await Product.findByPk(productData.product_id);
-    
-    if (!product) {
-      throw new Error('Product not found');
-    }
-    
-    if (!product.isAvailable) {
-      throw new Error('Product is not available');
-    }
-    
-    if (product.stockCount < productData.quantity) {
-      throw new Error('Not enough stock available');
-    }
-    
-    // Check if item already exists in cart
-    let cartItem = await CartItem.findOne({
-      where: {
-        cart_id: cart.id,
-        product_id: product.id
-      }
-    });
-    
-    if (cartItem) {
-      const newQuantity = cartItem.quantity + (productData.quantity || 1);
-      
-      if (newQuantity > product.stockCount) {
-        throw new Error('Requested quantity exceeds available stock');
-      }
-      
-      cartItem.quantity = newQuantity;
-      await cartItem.save();
-    } else {
-      // Create new cart item
-      cartItem = await CartItem.create({
-        cart_id: cart.id,
-        product_id: product.id,
-        quantity: productData.quantity || 1
-      });
-    }
-    
-    cart.updatedAt = new Date();
-    await cart.save();
-    
-    return await getCartWithItems(userId);
-  } catch (error) {
-    throw error;
+const addItem = async (userId, productId, quantity) => {
+  const cart = await getByUser(userId) || await create(userId);
+  const product = await Product.findById(productId);
+  
+  if (!product) {
+    throw new Error('Product not found');
   }
+  
+  // Check if item already exists in cart
+  const itemIndex = cart.items.findIndex(item => 
+    item.product._id.toString() === productId.toString()
+  );
+  
+  if (itemIndex > -1) {
+    // Item exists, update quantity
+    cart.items[itemIndex].quantity += quantity;
+  } else {
+    // Item does not exist, add new item
+    cart.items.push({
+      product: productId,
+      quantity: quantity,
+      price: product.price
+    });
+  }
+  
+  // Recalculate total
+  cart.total = cart.items.reduce((total, item) => {
+    return total + (item.price * item.quantity);
+  }, 0);
+  
+  await cart.save();
+  
+  return await getByUser(userId);
 };
 
-// Update cart item quantity
-const updateCartItem = async (userId, itemId, quantity) => {
-  try {
-    // Get cart
-    const cart = await Cart.findOne({
-      where: { user_id: userId }
-    });
-    
-    if (!cart) {
-      throw new Error('Cart not found');
-    }
-    
-    // Find cart item
-    const cartItem = await CartItem.findOne({
-      where: {
-        id: itemId,
-        cart_id: cart.id
-      },
-      include: [Product]
-    });
-    
-    if (!cartItem) {
-      throw new Error('Item not found in cart');
-    }
-    
-    if (quantity <= 0) {
-      // Remove item if quantity is zero or negative
-      await cartItem.destroy();
-    } else {
-      // Check if enough stock
-      if (quantity > cartItem.Product.stockCount) {
-        throw new Error('Requested quantity exceeds available stock');
-      }
-      
-      // Update quantity
-      cartItem.quantity = quantity;
-      await cartItem.save();
-    }
-    
-    cart.updatedAt = new Date();
-    await cart.save();
-    
-    return await getCartWithItems(userId);
-  } catch (error) {
-    throw error;
+// Update item quantity
+const updateItemQuantity = async (userId, productId, quantity) => {
+  const cart = await getByUser(userId);
+  
+  if (!cart) {
+    throw new Error('Cart not found');
   }
+  
+  const itemIndex = cart.items.findIndex(item => 
+    item.product._id.toString() === productId.toString()
+  );
+  
+  if (itemIndex === -1) {
+    throw new Error('Item not found in cart');
+  }
+  
+  if (quantity <= 0) {
+    // Remove item if quantity is zero or negative
+    cart.items.splice(itemIndex, 1);
+  } else {
+    // Update quantity
+    cart.items[itemIndex].quantity = quantity;
+  }
+  
+  // Recalculate total
+  cart.total = cart.items.reduce((total, item) => {
+    return total + (item.price * item.quantity);
+  }, 0);
+  
+  await cart.save();
+  
+  return await getByUser(userId);
 };
 
 // Remove item from cart
-const removeCartItem = async (userId, itemId) => {
-  try {
-    // Get cart
-    const cart = await Cart.findOne({
-      where: { user_id: userId }
-    });
-    
-    if (!cart) {
-      throw new Error('Cart not found');
-    }
-    
-    // Remove item
-    const result = await CartItem.destroy({
-      where: {
-        id: itemId,
-        cart_id: cart.id
-      }
-    });
-    
-    if (result === 0) {
-      throw new Error('Item not found in cart');
-    }
-    
-    cart.updatedAt = new Date();
-    await cart.save();
-    
-    return await getCartWithItems(userId);
-  } catch (error) {
-    throw error;
+const removeItem = async (userId, productId) => {
+  const cart = await getByUser(userId);
+  
+  if (!cart) {
+    throw new Error('Cart not found');
   }
+  
+  cart.items = cart.items.filter(item => 
+    item.product._id.toString() !== productId.toString()
+  );
+  
+  // Recalculate total
+  cart.total = cart.items.reduce((total, item) => {
+    return total + (item.price * item.quantity);
+  }, 0);
+  
+  await cart.save();
+  
+  return await getByUser(userId);
 };
 
 // Clear cart
 const clearCart = async (userId) => {
-  try {
-    // Get cart
-    const cart = await Cart.findOne({
-      where: { user_id: userId }
-    });
-    
-    if (!cart) {
-      return true;
-    }
-    
-    // Remove all items
-    await CartItem.destroy({
-      where: {
-        cart_id: cart.id
-      }
-    });
-    
-    cart.updatedAt = new Date();
-    await cart.save();
-    
-    return true;
-  } catch (error) {
-    throw error;
+  const cart = await getByUser(userId);
+  
+  if (!cart) {
+    throw new Error('Cart not found');
   }
+  
+  cart.items = [];
+  cart.total = 0;
+  
+  await cart.save();
+  
+  return cart;
 };
 
 module.exports = {
-  getOrCreateCart,
-  getCartWithItems,
-  addItemToCart,
-  updateCartItem,
-  removeCartItem,
+  getByUser,
+  create,
+  addItem,
+  updateItemQuantity,
+  removeItem,
   clearCart
 };

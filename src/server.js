@@ -3,6 +3,7 @@ const express = require('express');
 const morgan = require('morgan');
 const cors = require('cors');
 const { testConnection } = require('./config/db');
+const { connectToMongoDB } = require('./config/mongodb');
 const { initDatabase } = require('./config/dbInit');
 
 const app = express();
@@ -33,11 +34,14 @@ app.use(errorHandler);
 // Start server
 const startServer = async () => {
     try {
+        // Connect to MongoDB
+        await connectToMongoDB();
+        
         // Test database connection
         const isConnected = await testConnection();
         
         if (isConnected) {
-            // Initialize database schema and insert sample data if needed
+            // Initialize database collections and insert sample data if needed
             await initDatabase();
             
             app.listen(port, () => {

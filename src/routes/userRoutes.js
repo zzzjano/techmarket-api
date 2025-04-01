@@ -15,4 +15,7 @@ router.put('/:id', userValidatorMiddleware, userController.updateUser);
 // Delete user
 router.delete('/:id', userController.deleteUser);
 
+// Create user
+router.post('/', userValidatorMiddleware, userController.createUser);
+
 module.exports = router;

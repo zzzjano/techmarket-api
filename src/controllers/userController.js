@@ -118,9 +118,36 @@ const deleteUser = async (req, res, next) => {
   }
 };
 
+const createUser = async (req, res, next) => {
+  try {
+    const { username, email, password, first_name, last_name } = req.body;
+    
+    // Check if user already exists
+    const existingUser = await userModel.getByUsername(username) || await userModel.getByEmail(email);
+    if (existingUser) {
+      const error = new Error('Username or email already exists');
+      error.status = 400;
+      throw error;
+    }
+
+    // Create new user
+    const newUser = await userModel.create({ username, email, password, first_name, last_name });
+    
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      user: newUser
+    });
+  } catch (error) {
+    console.error('Error creating user:', error.message);
+    next(error);
+  }
+}
+
 module.exports = {
   getAllUsers,
   getUserById,
   updateUser,
-  deleteUser
+  deleteUser,
+  createUser
 };

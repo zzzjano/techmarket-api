@@ -1,22 +1,16 @@
-const { Sequelize } = require('sequelize');
-
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
-    dialect: 'mysql',
-    logging: false
-  }
-);
+const { mongoose } = require('./mongodb');
 
 // Test database connection
 const testConnection = async () => {
   try {
-    await sequelize.authenticate();
-    console.log('Database connection established successfully.');
-    return true;
+    const state = mongoose.connection.readyState;
+    if (state === 1) {
+      console.log('MongoDB connection established successfully.');
+      return true;
+    } else {
+      console.log('MongoDB not connected. Connection state:', state);
+      return false;
+    }
   } catch (error) {
     console.error('Database connection failed:', error.message);
     return false;
@@ -24,6 +18,5 @@ const testConnection = async () => {
 };
 
 module.exports = {
-  sequelize,
   testConnection
 };

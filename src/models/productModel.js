@@ -1,32 +1,22 @@
-const { Product, Category } = require('./index');
-const { Op } = require('sequelize');
+const Product = require('./productSchema');
+const Category = require('./categorySchema');
 
 // Get all products with category information
 const getAll = async () => {
-  return await Product.findAll({
-    include: [{
-      model: Category,
-      attributes: ['name', 'description']
-    }]
-  });
+  return await Product.find().populate('category');
 };
 
 // Get a single product by ID with category information
 const getById = async (id) => {
-  return await Product.findByPk(id, {
-    include: [{
-      model: Category,
-      attributes: ['name', 'description']
-    }]
-  });
+  return await Product.findById(id).populate('category');
 };
 
 // Create a new product
 const create = async (product) => {
-  // Create new product with category_id
+  // Create new product
   const newProduct = await Product.create({
     name: product.name,
-    category_id: product.category_id,
+    category: product.category,
     description: product.description,
     price: product.price,
     stockCount: product.stockCount,
@@ -35,12 +25,12 @@ const create = async (product) => {
     isAvailable: product.isAvailable !== undefined ? product.isAvailable : true
   });
   
-  return await getById(newProduct.id);
+  return await getById(newProduct._id);
 };
 
 // Update a product
 const update = async (id, productData) => {
-  const product = await Product.findByPk(id);
+  const product = await Product.findById(id);
   
   if (!product) {
     throw new Error('Product not found');
@@ -60,70 +50,60 @@ const update = async (id, productData) => {
 
 // Delete a product
 const remove = async (id) => {
-  const rowsDeleted = await Product.destroy({
-    where: { id }
-  });
-  
-  return rowsDeleted > 0;
+  const result = await Product.deleteOne({ _id: id });
+  return result.deletedCount > 0;
 };
 
 const searchProducts = async (options = {}) => {
-  // Build where conditions
-  const whereConditions = {};
-  
-  const includeOptions = [{
-    model: Category,
-    attributes: ['name', 'description']
-  }];
+  // Build filter conditions
+  const filter = {};
   
   // Apply filters if provided
   if (options.available !== undefined) {
-    whereConditions.isAvailable = options.available;
+    filter.isAvailable = options.available;
   }
   
-  if (options.category_id) {
-    whereConditions.category_id = options.category_id;
+  if (options.category) {
+    filter.category = options.category;
   }
   
   if (options.brand) {
-    whereConditions.brand = options.brand;
+    filter.brand = options.brand;
   }
   
   // Apply price range filters
-  if (options.minPrice !== undefined) {
-    whereConditions.price = whereConditions.price || {};
-    whereConditions.price[Op.gte] = options.minPrice;
+  if (options.minPrice !== undefined || options.maxPrice !== undefined) {
+    filter.price = {};
+    
+    if (options.minPrice !== undefined) {
+      filter.price.$gte = options.minPrice;
+    }
+    
+    if (options.maxPrice !== undefined) {
+      filter.price.$lte = options.maxPrice;
+    }
   }
   
-  if (options.maxPrice !== undefined) {
-    whereConditions.price = whereConditions.price || {};
-    whereConditions.price[Op.lte] = options.maxPrice;
-  }
-  
-  let order = [['id', 'ASC']];
+  let sortOption = { _id: 1 };
   
   if (options.sortBy) {
     const sortField = options.sortBy.toLowerCase();
-    const sortDirection = options.sortOrder?.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const sortDirection = options.sortOrder?.toLowerCase() === 'desc' ? -1 : 1;
     
     switch(sortField) {
       case 'price':
-        order = [['price', sortDirection]];
+        sortOption = { price: sortDirection };
         break;
       case 'name':
-        order = [['name', sortDirection]];
+        sortOption = { name: sortDirection };
         break;
       case 'brand':
-        order = [['brand', sortDirection]];
+        sortOption = { brand: sortDirection };
         break;
     }
   }
   
-  return await Product.findAll({
-    where: whereConditions,
-    include: includeOptions,
-    order: order
-  });
+  return await Product.find(filter).sort(sortOption).populate('category');
 };
 
 module.exports = {
