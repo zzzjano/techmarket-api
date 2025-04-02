@@ -10,10 +10,7 @@ describe('User Model', () => {
 
   beforeAll(async () => {
 
-    await mongoose.connect(MONGO_TEST_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
+    await mongoose.connect(MONGO_TEST_URI);
     console.log('Connected to test database');
     
     await User.deleteMany({});

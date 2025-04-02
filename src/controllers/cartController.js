@@ -60,7 +60,7 @@ const removeFromCart = async (req, res, next) => {
       });
     }
     
-    const cart = await cartModel.removeCartItem(userId, itemId);
+    const cart = await cartModel.removeItem(userId, itemId);
     res.json(cart);
   } catch (error) {
     next(error);

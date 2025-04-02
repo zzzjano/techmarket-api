@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Cart = require('./cartSchema');
 const { Schema } = mongoose;
 
 const productSchema = new Schema({

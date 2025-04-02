@@ -287,7 +287,7 @@ describe('Review Model', () => {
     const review = await reviewModel.create(legacyReviewData);
     
     expect(review).toBeDefined();
-    expect(review.content).toBe('This uses the legacy old field');
+    expect(review.content).toBe('This uses the old comment field');
   });
 
   test('should search reviews by text content', async () => {
