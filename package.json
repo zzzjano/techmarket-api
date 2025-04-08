@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "generate_data": "node scripts/generateTestData.js",
     "test": "jest"
   },
   "keywords": [],

@@ -22,6 +22,7 @@ app.use('/api/users', require('./routes/userRoutes.js'));
 app.use('/api/reviews', require('./routes/reviewRoutes.js'));
 app.use('/api/categories', require('./routes/categoryRoutes.js'));
 app.use('/api/cart', require('./routes/cartRoutes.js'));
+app.use('/api/analytics', require('./routes/analyticsRoutes.js'));
 
 app.get('/', (req, res) => {
     res.send('Hello world');
